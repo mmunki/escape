@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "escape",
+  "version": "${version}",
+  "name": "Escape",
+  "description": "A player-skinned horror hunter that appears for two minutes every five minutes, wears iron armor and a dragon head, wields an iron axe, lands critical hits and avoids traps. Kill it or survive until it disappears.",
+  "authors": [
+    "mmunki"
+  ],
+  "contact": {
+    "homepage": "https://github.com/mmunki/escape",
+    "sources": "https://github.com/mmunki/escape",
+    "issues": "https://github.com/mmunki/escape/issues"
+  },
+  "license": "MIT",
+  "icon": "assets/escape/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "tw.mmunki.escape.EscapeMod"
+    ],
+    "client": [
+      "tw.mmunki.escape.client.EscapeClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.20.1",
+    "minecraft": "${minecraft_version_range}",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}

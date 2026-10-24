@@ -1,0 +1,82 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
+    id 'maven-publish'
+}
+
+version = "${project.mod_version}+${project.minecraft_version}"
+group = project.maven_group
+
+def minecraftParts = project.minecraft_version.tokenize('.')
+def minecraftRange = ">=${project.minecraft_version} <${minecraftParts[0]}.${(minecraftParts[1] as int) + 1}"
+
+base {
+    archivesName = project.archives_base_name
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+    testImplementation platform("org.junit:junit-bom:5.13.4")
+    testImplementation "org.junit.jupiter:junit-jupiter"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+processResources {
+    inputs.property "version", project.mod_version
+    inputs.property "minecraft_version", project.minecraft_version
+    filesMatching("fabric.mod.json") {
+        expand "version": project.mod_version,
+               "minecraft_version": project.minecraft_version,
+               "minecraft_version_range": minecraftRange
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 25
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        exceptionFormat 'full'
+    }
+}
+
+java {
+    withSourcesJar()
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+}
+
+jar {
+    manifest {
+        attributes(
+                "Implementation-Title": "Escape",
+                "Implementation-Version": project.mod_version,
+                "Implementation-Vendor": "mmunki",
+                "Specification-Title": "Escape",
+                "Specification-Version": project.mod_version,
+                "Specification-Vendor": "mmunki")
+    }
+    from("LICENSE") {
+        rename { "${it}_${project.base.archivesName.get()}" }
+    }
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
+    repositories {
+    }
+}
