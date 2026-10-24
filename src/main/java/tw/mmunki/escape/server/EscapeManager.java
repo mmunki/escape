@@ -5,14 +5,17 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.TicketType;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.state.BlockState;
 import tw.mmunki.escape.Escape;
 import tw.mmunki.escape.EscapeConfig;
 import tw.mmunki.escape.EscapeSettings;
 import tw.mmunki.escape.core.EscapeCycle;
+import tw.mmunki.escape.core.TargetSelector;
 import tw.mmunki.escape.entity.EscapeEntities;
 import tw.mmunki.escape.entity.EscapeEntity;
 
@@ -21,10 +24,15 @@ import java.util.List;
 import java.util.UUID;
 
 public final class EscapeManager {
+    private static final TicketType ESCAPE_TICKET = new TicketType(
+            TicketType.NO_TIMEOUT, TicketType.FLAG_LOADING | TicketType.FLAG_SIMULATION);
+
     private MinecraftServer server;
     private EscapeCycle cycle;
     private EscapeEntity active;
     private UUID activeTarget;
+    private ServerLevel ticketLevel;
+    private ChunkPos ticketChunk;
 
     public void start(MinecraftServer server) {
         this.server = server;
@@ -63,9 +71,12 @@ public final class EscapeManager {
         if (active != null && (active.isRemoved() || !active.isAlive())) {
             active = null;
             activeTarget = null;
+            releaseTicket();
         }
         boolean scheduled = cycle.tick();
         if (active != null) {
+            activeTarget = active.getTargetUuid();
+            keepLoaded(active);
             if (scheduled) {
                 cycle.deferFullCycle();
             }
@@ -80,8 +91,10 @@ public final class EscapeManager {
     }
 
     public void onDisconnect(ServerPlayer player) {
-        if (activeTarget != null && activeTarget.equals(player.getUUID())) {
-            despawn();
+        // The hunter is never allowed to leave because its current target
+        // disconnected; it re-targets the nearest remaining survival player.
+        if (active != null) {
+            active.retargetNow();
         }
     }
 
@@ -99,6 +112,22 @@ public final class EscapeManager {
         if (server == null) {
             return false;
         }
+        List<ServerPlayer> candidates = eligiblePlayers(settings);
+        if (candidates.isEmpty()) {
+            return false;
+        }
+        BlockPos anchor = server.overworld().getRespawnData().pos();
+        List<TargetSelector.Candidate<ServerPlayer>> positioned = new ArrayList<>();
+        for (ServerPlayer player : candidates) {
+            positioned.add(new TargetSelector.Candidate<>(
+                    player, player.getX(), player.getY(), player.getZ(), true));
+        }
+        ServerPlayer nearest = TargetSelector.nearest(
+                positioned, anchor.getX() + 0.5D, anchor.getY(), anchor.getZ() + 0.5D).orElse(candidates.get(0));
+        return spawnFor(nearest, settings) != null;
+    }
+
+    private List<ServerPlayer> eligiblePlayers(EscapeSettings settings) {
         List<ServerPlayer> candidates = new ArrayList<>();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             if (!player.isAlive() || player.isSpectator()) {
@@ -112,11 +141,7 @@ public final class EscapeManager {
             }
             candidates.add(player);
         }
-        if (candidates.isEmpty()) {
-            return false;
-        }
-        int index = server.overworld().getRandom().nextInt(candidates.size());
-        return spawnFor(candidates.get(index), settings) != null;
+        return candidates;
     }
 
     private EscapeEntity spawnFor(ServerPlayer player, EscapeSettings settings) {
@@ -136,7 +161,8 @@ public final class EscapeManager {
             return null;
         }
         active = entity;
-        activeTarget = player.getUUID();
+        activeTarget = entity.getTargetUuid() == null ? player.getUUID() : entity.getTargetUuid();
+        keepLoaded(entity);
         Escape.LOGGER.info("Escape {}+{} spawned for {} at {} {} {}",
                 Escape.VERSION, "26.2", player.getScoreboardName(),
                 pos.getX(), pos.getY(), pos.getZ());
@@ -180,8 +206,31 @@ public final class EscapeManager {
                 && head.getFluidState().isEmpty();
     }
 
+    private void keepLoaded(EscapeEntity entity) {
+        if (!(entity.level() instanceof ServerLevel level)) {
+            return;
+        }
+        ChunkPos pos = entity.chunkPosition();
+        if (level == ticketLevel && pos.equals(ticketChunk)) {
+            return;
+        }
+        releaseTicket();
+        level.getChunkSource().addTicketWithRadius(ESCAPE_TICKET, pos, 1);
+        ticketLevel = level;
+        ticketChunk = pos;
+    }
+
+    private void releaseTicket() {
+        if (ticketLevel != null && ticketChunk != null) {
+            ticketLevel.getChunkSource().removeTicketWithRadius(ESCAPE_TICKET, ticketChunk, 1);
+        }
+        ticketLevel = null;
+        ticketChunk = null;
+    }
+
     public void despawn() {
         EscapeEntity entity = active;
+        releaseTicket();
         if (entity == null) {
             activeTarget = null;
             return;
@@ -216,7 +265,7 @@ public final class EscapeManager {
             return "nobody";
         }
         ServerPlayer player = server.getPlayerList().getPlayer(activeTarget);
-        return player == null ? "nobody" : player.getScoreboardName();
+        return player == null ? "nearest player" : player.getScoreboardName();
     }
 
     public boolean hasActive() {

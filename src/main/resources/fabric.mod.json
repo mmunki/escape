@@ -3,7 +3,7 @@
   "id": "escape",
   "version": "${version}",
   "name": "Escape",
-  "description": "A player-skinned horror hunter that appears for two minutes every five minutes, wears iron armor and a dragon head, wields an iron axe, lands critical hits and avoids traps. Kill it or survive until it disappears.",
+  "description": "A player-skinned horror hunter that appears for at least two minutes every five minutes, wears iron armor and a dragon head, wields an iron axe and shield, mines and bridges towards the nearest player, fights like an expert PvP player and drops one rare item when killed.",
   "authors": [
     "mmunki"
   ],

@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 VERSION="${1:-26.2}"
-JAR="${2:-build/libs/escape-1.0+${VERSION}.jar}"
+JAR="${2:-build/libs/escape-1.1+${VERSION}.jar}"
 
 if [ ! -f "$JAR" ]; then
     echo "error: jar not found: $JAR" >&2
@@ -34,6 +34,12 @@ require_entry "tw/mmunki/escape/command/EscapeCommands.class"
 require_entry "tw/mmunki/escape/core/EscapeCycle.class"
 require_entry "tw/mmunki/escape/entity/EscapeEntities.class"
 require_entry "tw/mmunki/escape/entity/EscapeEntity.class"
+require_entry "tw/mmunki/escape/entity/goal/EscapeHuntGoal.class"
+require_entry "tw/mmunki/escape/core/EscapeLifetime.class"
+require_entry "tw/mmunki/escape/core/TargetSelector.class"
+require_entry "tw/mmunki/escape/core/HuntPlanner.class"
+require_entry "tw/mmunki/escape/core/PvpStateMachine.class"
+require_entry "tw/mmunki/escape/core/DeathLootTable.class"
 require_entry "tw/mmunki/escape/entity/goal/EscapeHazardGoal.class"
 require_entry "tw/mmunki/escape/server/EscapeManager.class"
 
@@ -48,7 +54,7 @@ with zipfile.ZipFile(jar_path) as jar:
     icon = jar.read("assets/escape/icon.png")
 
 assert metadata["id"] == "escape", metadata["id"]
-assert metadata["version"] == "1.0", metadata["version"]
+assert metadata["version"] == "1.1", metadata["version"]
 assert metadata["environment"] == "*", metadata["environment"]
 assert metadata["depends"]["java"] == ">=25"
 assert metadata["depends"]["fabricloader"] == ">=0.20.1"
